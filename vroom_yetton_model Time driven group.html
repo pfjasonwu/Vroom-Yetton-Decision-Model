@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vroom-Yetton Model - 23 Paths Verified</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #283593; /* Indigo */
+            --accent-color: #5c6bc0;  /* Lighter Indigo */
+            --bg-color: #e8eaf6;
+            --card-bg: #ffffff;
+            --text-main: #1a237e;
+            --text-sub: #5c6bc0;
+        }
+
+        body {
+            font-family: 'Roboto', 'Noto Sans TC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 950px;
+            background: var(--card-bg);
+            border-radius: 25px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+            padding: 40px 60px;
+            position: relative;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid var(--accent-color);
+            padding-bottom: 20px;
+        }
+
+        h1 { font-size: 2.5rem; color: var(--primary-color); font-weight: 700; }
+        .subtitle { color: var(--text-sub); font-size: 1.2rem; }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%; background-color: #c5cae9; border-radius: 10px; margin-bottom: 35px; height: 12px; overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%; background-color: var(--primary-color); width: 0%; transition: width 0.6s ease;
+        }
+
+        /* Question Section */
+        .question-box { display: none; animation: fadeIn 0.5s ease; }
+        .question-box.active { display: block; }
+        
+        .q-number {
+            font-size: 1rem; color: var(--accent-color); font-weight: 700; margin-bottom: 15px; border-bottom: 1px dashed #9fa8da; padding-bottom: 5px; display: block;
+        }
+        .q-text-en { font-size: 1.6rem; font-weight: 500; margin-bottom: 10px; color: var(--primary-color); }
+        .q-text-zh { font-size: 1.3rem; color: #555; margin-bottom: 40px; font-weight: 400; }
+        
+        .options { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        
+        button {
+            padding: 20px 30px; border-radius: 15px; font-size: 1.2rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; background-color: #f5f5f5; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: var(--text-main); border: 1px solid #dbe0e8;
+        }
+        button:hover {
+            transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: var(--primary-color); background-color: #e8eaf6; color: var(--primary-color);
+        }
+        
+        .control-buttons { display: flex; gap: 15px; margin-top: 25px; }
+        .back-btn, .mini-restart-btn { width: 100%; padding: 12px; border-radius: 10px; font-size: 1rem; border: none; color: white; }
+        .back-btn { background-color: #9fa8da; }
+        .back-btn:hover:not(:disabled) { background-color: #7986cb; }
+        .back-btn:disabled { background-color: #e0e0e0; cursor: default; }
+        .mini-restart-btn { background-color: #ef5350; }
+        .mini-restart-btn:hover { background-color: #e53935; }
+
+        /* Result Section */
+        #result-box { display: none; text-align: center; animation: slideUp 0.8s ease; }
+        .result-code { font-size: 6rem; font-weight: 900; color: var(--primary-color); margin: 10px 0; line-height: 1; }
+        .result-title-en { font-size: 1.7rem; font-weight: 700; color: var(--primary-color); }
+        .result-title-zh { font-size: 1.6rem; color: #333; margin-bottom: 30px; }
+        .definition-card {
+            background: #e8eaf6; border-left: 8px solid var(--primary-color); padding: 30px; text-align: left; border-radius: 10px; margin-top: 30px;
+        }
+        .def-text-en { font-style: italic; color: #444; margin-bottom: 15px; font-size: 1.1rem; }
+        .def-text-zh { color: var(--primary-color); font-weight: 500; font-size: 1.2rem; }
+        
+        /* Path History */
+        .path-history-section {
+            margin-top: 40px; padding: 25px; border: 1px solid #e0e0e0; border-radius: 15px; background-color: #fafafa; text-align: left;
+        }
+        .path-history-section h3 { color: var(--primary-color); border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; margin-bottom: 20px; }
+        .path-item { display: flex; align-items: flex-start; margin-bottom: 12px; padding-left: 10px; border-left: 4px solid #c5cae9; }
+        .path-q-num { font-weight: 700; color: var(--accent-color); margin-right: 15px; width: 40px; flex-shrink: 0; }
+        .path-q-text .answer { font-weight: 700; color: var(--primary-color); margin-left: 8px; background: #c5cae9; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 768px) {
+            .container { padding: 30px; }
+            .options { grid-template-columns: 1fr; }
+            .control-buttons { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Vroom-Yetton-Jago Time-Driven Desicion Tree - Group Poblems</h1>
+            <div class="subtitle">團體下屬時間壓力導向決策模型</div>
+        </header>
+
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div id="question-container"></div>
+
+        <div id="result-box">
+            <div class="result-header">Recommended Decision Style | 建議決策方式</div>
+            <div class="result-code" id="res-code"></div>
+            <div class="result-title-en" id="res-title-en"></div>
+            <div class="result-title-zh" id="res-title-zh"></div>
+            
+            <div class="definition-card">
+                <div class="def-text-en" id="res-def-en"></div>
+                <div class="def-text-zh" id="res-def-zh"></div>
+            </div>
+
+            <div class="path-history-section">
+                <h3>Final Path History | 最終路徑紀錄</h3>
+                <div id="path-history-list"></div>
+            </div>
+
+            <button class="mini-restart-btn" style="margin-top: 30px; background-color: var(--primary-color);" onclick="restart()">Analyze Another Scenario (重新分析)</button>
+        </div>
+
+        <div class="path-history-section" id="livePathHistory" style="display:none;">
+            <h3>Current Path | 當前路徑</h3>
+            <div id="livePathHistoryList"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const questions = {
+            q1: { id: 'q1', en: "1. How important is the technical quality of this decision?", zh: "1. 此決策的技術品質有多重要？", type: "HighLow" },
+            q2: { id: 'q2', en: "2. How important is subordinate commitment to the decision?", zh: "2. 部屬對決策的承諾（接受度）有多重要？", type: "HighLow" },
+            q3: { id: 'q3', en: "3. Do you have sufficient information to make a high-quality decision?", zh: "3. 您是否有足夠的資訊做出高品質的決策？", type: "YesNo" },
+            q4: { id: 'q4', en: "4. Is the problem well structured?", zh: "4. 問題是否結構良好（結構清晰）？", type: "YesNo" },
+            q5: { id: 'q5', en: "5. If you were to make the decision by yourself, is it reasonably certain that your subordinate(s) would be committed to the decision?", zh: "5. 如果您獨自做決定，部屬是否相當確定會支持該決定？", type: "YesNo" },
+            q6: { id: 'q6', en: "6. Do subordinates share the organizational goals to be attained in solving this problem?", zh: "6. 部屬是否認同解決此問題所要達成的組織目標？", type: "YesNo" },
+            q7: { id: 'q7', en: "7. Is conflict among subordinates over preferred solutions likely?", zh: "7. 部屬之間是否可能對偏好的解決方案產生衝突？", type: "YesNo" },
+            q8: { id: 'q8', en: "8. Do subordinates have sufficient information to make a high-quality decision?", zh: "8. 部屬是否有足夠的資訊做出高品質的決策？", type: "YesNo" }
+        };
+
+        const decisionStyles = {
+            "A1": { titleEn: "Autocratic I", titleZh: "管理者自行決策", defEn: "You solve the problem or make the decision yourself using the information available to you at the present time.", defZh: "管理者利用手邊現有的資訊，獨自解決問題或做出決定。" },
+            "A2": { titleEn: "Autocratic II", titleZh: "管理者蒐集資訊後自行決策", defEn: "You obtain any necessary information from subordinates, then decide on a solution to the problem yourself. The input provided by them is clearly in response to your request for specific information.", defZh: "管理者向部屬蒐集必要資訊，然後獨自做決定。部屬只提供資料，不參與問題定義或方案評估，甚至可能不知道決策目的。" },
+            "C1": { titleEn: "Consultative I", titleZh: "個別諮詢後決策", defEn: "You share the problem with the relevant subordinates individually, getting their ideas and suggestions without bringing them together as a group. Then you make the decision.", defZh: "管理者與相關部屬個別討論問題，徵求意見，不召開小組會議。最終由管理者做決定，該決定不一定反映部屬意見。" },
+            "C2": { titleEn: "Consultative II", titleZh: "團體諮詢後決策", defEn: "You share the problem with your subordinates in a group meeting. In this meeting you obtain their ideas and suggestions. Then you make the decision.", defZh: "管理者召集部屬開團體會議，分享問題並聽取建議。最終仍由管理者做決定，該決定不一定反映部屬意見。" },
+            "G2": { titleEn: "Group II", titleZh: "團體共識決策", defEn: "You share the problem with your subordinates as a group. Together you generate and evaluate alternatives and attempt to reach agreement (consensus) on a solution. You are willing to accept and implement any solution that has the support of the entire group.", defZh: "管理者與團隊共同討論、評估方案並尋求共識。管理者扮演主席角色引導討論，不強推己見，並願意接受與執行獲得團隊支持的解決方案。" }
+        };
+
+        let answers = {};
+        let pathHistory = [];
+        let currentQuestionId = 'q1';
+
+        // --- 核心邏輯：根據 23 條路徑嚴格判斷結果 ---
+        function getDecisionMode() {
+            const a = answers;
+            
+            // Path 21, 22, 23 (Q1=Low)
+            if (a['q1'] === 'Low') {
+                if (a['q2'] === 'Low') return "A1"; // Path 21
+                if (a['q2'] === 'High') {
+                    if (a['q5'] === 'Yes') return "A1"; // Path 22
+                    if (a['q5'] === 'No') return "G2";  // Path 23
+                }
+            } 
+            // Q1=High
+            else { 
+                // Path 16, 17, 18, 19, 20 (Q2=Low)
+                if (a['q2'] === 'Low') {
+                    if (a['q3'] === 'Yes') return "A1"; // Path 20
+                    if (a['q3'] === 'No') {
+                        if (a['q4'] === 'No') return "C2"; // Path 19
+                        if (a['q4'] === 'Yes') {
+                            if (a['q6'] === 'No') return "A2"; // Path 16
+                            if (a['q6'] === 'Yes') {
+                                if (a['q7'] === 'No') return "A2"; // Path 17
+                                if (a['q7'] === 'Yes') return "C1"; // Path 18
+                            }
+                        }
+                    }
+                }
+                // Q2=High
+                else {
+                    // Path 1, 2, 3, 4 (Q3=Yes)
+                    if (a['q3'] === 'Yes') { 
+                        if (a['q5'] === 'Yes') return "A1"; // Path 1
+                        if (a['q5'] === 'No') {
+                            if (a['q6'] === 'No') return "C2"; // Path 4
+                            if (a['q6'] === 'Yes') {
+                                if (a['q8'] === 'Yes') return "G2"; // Path 2
+                                if (a['q8'] === 'No') return "C2";  // Path 3
+                            }
+                        }
+                    } 
+                    // Path 5 - 15 (Q3=No)
+                    else { 
+                        // Path 5, 6, 7, 8 (Q4=No)
+                        if (a['q4'] === 'No') { 
+                            if (a['q5'] === 'Yes') return "C2"; // Path 5 (您提到的 High-High-No-No-Yes)
+                            if (a['q5'] === 'No') { 
+                                if (a['q6'] === 'No') return "C2"; // Path 6
+                                if (a['q6'] === 'Yes') {
+                                    if (a['q8'] === 'Yes') return "G2"; // Path 8
+                                    if (a['q8'] === 'No') return "C2";  // Path 7
+                                }
+                            }
+                        } 
+                        // Path 9 - 15 (Q4=Yes)
+                        else { 
+                            // Path 13, 14, 15 (Q5=Yes)
+                            if (a['q5'] === 'Yes') {
+                                if (a['q6'] === 'No') return "A2"; // Path 13
+                                if (a['q6'] === 'Yes') {
+                                    if (a['q7'] === 'No') return "A2"; // Path 14
+                                    if (a['q7'] === 'Yes') return "C1"; // Path 15
+                                }
+                            } 
+                            // Path 9, 10, 11, 12 (Q5=No)
+                            else { 
+                                if (a['q6'] === 'No') return "C2"; // Path 12
+                                if (a['q6'] === 'Yes') {
+                                    if (a['q7'] === 'Yes') return "G2"; // Path 11
+                                    if (a['q7'] === 'No') {
+                                        if (a['q8'] === 'Yes') return "G2"; // Path 10
+                                        if (a['q8'] === 'No') return "C2";  // Path 9
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return "Error";
+        }
+
+        // --- 導航邏輯：決定下一題 ID ---
+        function determineNextQuestion(curr, val) {
+            const a = answers; 
+
+            // Q1 -> Q2
+            if (curr === 'q1') return 'q2'; 
+
+            // Q2
+            if (curr === 'q2') {
+                if (a['q1'] === 'Low') {
+                    // Path 21, 22, 23
+                    return (val === 'Low') ? 'finish' : 'q5'; // P21 (finish) or P22/23 (q5)
+                } else {
+                    // Path 1-20
+                    return 'q3'; 
+                }
+            }
+
+            // Q3
+            if (curr === 'q3') {
+                if (a['q2'] === 'Low') {
+                    // Path 16-20
+                    return (val === 'Yes') ? 'finish' : 'q4'; // P20 (finish) or P16-19 (q4)
+                } else {
+                    // Path 1-15
+                    return (val === 'Yes') ? 'q5' : 'q4'; // P1-4 (q5) or P5-15 (q4)
+                }
+            }
+
+            // Q4
+            if (curr === 'q4') {
+                if (a['q2'] === 'Low') {
+                    // Path 16-19
+                    return (val === 'No') ? 'finish' : 'q6'; // P19 (finish) or P16-18 (q6)
+                } else {
+                    // Path 5-15
+                    return 'q5'; // All paths P5-P15 go to Q5 next
+                }
+            }
+
+            // Q5
+            if (curr === 'q5') {
+                if (a['q1'] === 'Low') return 'finish'; // Path 22, 23 (End)
+
+                // Path 1-4 (Q3=Yes)
+                if (a['q3'] === 'Yes') {
+                    return (val === 'Yes') ? 'finish' : 'q6'; // P1 (finish) or P2-4 (q6)
+                } 
+                
+                // Path 5-15 (Q3=No)
+                if (a['q3'] === 'No') {
+                    if (a['q4'] === 'No') {
+                        // Path 5-8
+                        // **關鍵修正** Path 5 (Yes) -> Finish
+                        return (val === 'Yes') ? 'finish' : 'q6'; // P5 (finish) or P6-8 (q6)
+                    } else {
+                        // Path 9-15
+                        return 'q6'; 
+                    }
+                }
+            }
+
+            // Q6
+            if (curr === 'q6') {
+                // Path 16-18 (Q2=Low)
+                if (a['q2'] === 'Low') {
+                    return (val === 'No') ? 'finish' : 'q7'; // P16 (finish) or P17-18 (q7)
+                }
+
+                // Path 2-4 (Q3=Yes)
+                if (a['q3'] === 'Yes') {
+                    return (val === 'No') ? 'finish' : 'q8'; // P4 (finish) or P2-3 (q8)
+                }
+
+                // Path 6-15 (Q3=No)
+                if (a['q3'] === 'No') {
+                    if (a['q4'] === 'No') {
+                        // Path 6-8
+                        return (val === 'No') ? 'finish' : 'q8'; // P6 (finish) or P7-8 (q8)
+                    } else {
+                        // Path 9-15
+                        if (a['q5'] === 'Yes') {
+                            // Path 13-15
+                            return (val === 'No') ? 'finish' : 'q7'; // P13 (finish) or P14-15 (q7)
+                        } else {
+                            // Path 9-12
+                            return (val === 'No') ? 'finish' : 'q7'; // P12 (finish) or P9-11 (q7)
+                        }
+                    }
+                }
+            }
+
+            // Q7
+            if (curr === 'q7') {
+                // Path 17, 18 (Q2=Low)
+                if (a['q2'] === 'Low') return 'finish';
+
+                // Path 9-11, 14-15
+                if (a['q5'] === 'Yes') return 'finish'; // P14, 15
+                
+                // Path 9-11 (Q5=No)
+                if (a['q5'] === 'No') {
+                    return (val === 'Yes') ? 'finish' : 'q8'; // P11 (finish) or P9-10 (q8)
+                }
+            }
+
+            // Q8 (Always final step if reached)
+            if (curr === 'q8') return 'finish';
+
+            return "finish";
+        }
+
+        // --- UI Functions ---
+
+        function goBack() {
+            if (pathHistory.length === 0) return;
+            const lastAnswered = pathHistory.pop();
+            delete answers[lastAnswered.qId];
+            showQuestion(lastAnswered.qId);
+        }
+
+        function handleAnswer(value) {
+            answers[currentQuestionId] = value;
+            
+            // 避免重複紀錄同一個問題
+            if (pathHistory.length > 0 && pathHistory[pathHistory.length-1].qId === currentQuestionId) {
+                pathHistory.pop();
+            }
+
+            pathHistory.push({
+                qId: currentQuestionId,
+                answer: value,
+                question: questions[currentQuestionId]
+            });
+
+            const nextQ = determineNextQuestion(currentQuestionId, value);
+
+            if (nextQ === 'finish') {
+                showResult(getDecisionMode());
+            } else {
+                showQuestion(nextQ);
+            }
+        }
+
+        function renderPathHistory(isFinal = false) {
+            const listContainer = document.getElementById(isFinal ? 'path-history-list' : 'livePathHistoryList');
+            let html = '';
+            pathHistory.forEach((item) => {
+                const qNum = parseInt(item.qId.replace('q', ''));
+                const answered = (item.answer === 'High' || item.answer === 'Low') ? item.answer : (item.answer === 'Yes' ? '是 (Yes)' : '否 (No)');
+                html += `
+                    <div class="path-item">
+                        <div class="path-q-num">Q${qNum}</div>
+                        <div class="path-q-text">
+                            <span style="font-weight: 500;">${item.question.zh}</span>
+                            <span class="answer">→ ${answered}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            listContainer.innerHTML = html;
+        }
+
+        function showQuestion(qId) {
+            currentQuestionId = qId;
+            const q = questions[qId];
+            const container = document.getElementById('question-container');
+            const qNum = parseInt(qId.replace('q', ''));
+            const progress = (qNum / 8) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            document.getElementById('result-box').style.display = 'none';
+
+            const val1 = q.type === 'HighLow' ? 'High' : 'Yes';
+            const val2 = q.type === 'HighLow' ? 'Low' : 'No';
+            const label1 = q.type === 'HighLow' ? 'High (高)' : 'Yes (是)';
+            const label2 = q.type === 'HighLow' ? 'Low (低)' : 'No (否)';
+
+            container.innerHTML = `
+                <div class="question-box active">
+                    <span class="q-number">QUESTION ${qNum} / 8</span>
+                    <div class="q-text-en">${q.en}</div>
+                    <div class="q-text-zh">${q.zh}</div>
+                    <div class="options">
+                        <button onclick="handleAnswer('${val1}')">${label1}</button>
+                        <button onclick="handleAnswer('${val2}')">${label2}</button>
+                    </div>
+                    <div class="control-buttons">
+                        <button class="back-btn" onclick="goBack()" ${pathHistory.length === 0 ? 'disabled' : ''}>⬅️ 上一步</button>
+                        <button class="mini-restart-btn" onclick="restart()">🔄 重新開始</button>
+                    </div>
+                </div>
+            `;
+            renderPathHistory();
+            document.getElementById('livePathHistory').style.display = 'block';
+        }
+
+        function showResult(code) {
+            const container = document.getElementById('question-container');
+            const resultBox = document.getElementById('result-box');
+            const style = decisionStyles[code] || { titleEn: "Error", titleZh: "錯誤", defEn: "Path not defined.", defZh: "路徑未定義。" };
+            
+            container.innerHTML = ''; 
+            document.getElementById('progressBar').style.width = `100%`;
+            document.getElementById('res-code').textContent = code;
+            document.getElementById('res-title-en').textContent = style.titleEn;
+            document.getElementById('res-title-zh').textContent = style.titleZh;
+            document.getElementById('res-def-en').textContent = style.defEn;
+            document.getElementById('res-def-zh').textContent = style.defZh;
+
+            renderPathHistory(true);
+            document.getElementById('livePathHistory').style.display = 'none';
+            resultBox.style.display = 'block';
+        }
+
+        function restart() {
+            answers = {};
+            pathHistory = [];
+            document.getElementById('result-box').style.display = 'none';
+            document.getElementById('livePathHistory').style.display = 'none';
+            showQuestion('q1');
+        }
+
+        showQuestion('q1');
+    </script>
+</body>
+</html>
