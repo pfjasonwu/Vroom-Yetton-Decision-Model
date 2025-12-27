@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time-Driven Decision Tree - INdividual Problems</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .btn-yes {
+            background-color: #10B981; /* Emerald 500 */
+        }
+        .btn-yes:hover {
+            background-color: #059669; /* Emerald 600 */
+        }
+        .btn-no {
+            background-color: #EF4444; /* Red 500 */
+        }
+        .btn-no:hover {
+            background-color: #DC2626; /* Red 600 */
+        }
+        .btn-secondary {
+            background-color: #6B7280; /* Gray 500 */
+        }
+        .btn-secondary:hover {
+            background-color: #4B5563; /* Gray 600 */
+        }
+        .result-box {
+            border-left: 5px solid #3B82F6; /* Blue 500 */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Vroom-Yetton-Jago Time-Driven Decision Tree - Individual Problems</h1>
+            <p class="text-xl text-gray-600">單一下屬時間壓力導向決策模型</p>
+        </header>
+
+        <!-- Main Decision Card -->
+        <div id="decision-card" class="card p-6 md:p-10 mb-8">
+            <!-- Content will be rendered here by JavaScript -->
+        </div>
+
+        <!-- History and Controls Panel -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- Controls -->
+            <div class="md:col-span-1">
+                <div class="card p-4">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">操作 Controls</h3>
+                    <div class="space-y-3">
+                        <button onclick="goBack()" id="back-button" class="w-full py-2 px-4 rounded-lg text-white font-semibold btn-secondary disabled:opacity-50" disabled>
+                            上一步 Previous Step
+                        </button>
+                        <button onclick="restart()" class="w-full py-2 px-4 rounded-lg text-white font-semibold bg-gray-900 hover:bg-gray-700">
+                            重新開始 Restart
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Log -->
+            <div class="md:col-span-2">
+                <div class="card p-4">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">決策路徑 History</h3>
+                    <div id="history-log" class="space-y-2 text-sm text-gray-600 h-40 overflow-y-auto">
+                        <!-- History steps will be inserted here by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Structures
+        const Questions = {
+            'Q1': { zh: '決策的技術品質有多重要？', en: 'How important is the technical quality of this decision?', type: 'High/Low' },
+            'Q2': { zh: '下屬對決策的承諾有多重要？', en: 'How important is subordinate commitment to the decision?', type: 'High/Low' },
+            'Q3': { zh: '您有足夠資訊做出高品質決策嗎？', en: 'Do you have sufficient information to make a high-quality decision?', type: 'Yes/No' },
+            'Q4': { zh: '問題結構良好嗎？', en: 'Is the problem well structured?', type: 'Yes/No' },
+            'Q5': { zh: '如果您單獨做出決定，是否能合理確定您的下屬會對決策做出承諾？', en: 'If you were to make the decision by yourself, is it reasonably certain that your subordinate(s) would be committed to the decision?', type: 'Yes/No' },
+            'Q6': { zh: '下屬是否分享解決此問題所欲達成的組織目標？', en: 'Do subordinates share the organizational goals to be attained in solving this problem?', type: 'Yes/No' },
+            'Q7': { zh: '下屬之間對於偏好的解決方案是否可能存在衝突？', en: 'Is conflict among subordinates over preferred solutions likely?', type: 'Yes/No' },
+            'Q8': { zh: '下屬是否有足夠資訊做出高品質決策？', en: 'Do subordinates have sufficient information to make a high-quality decision?', type: 'Yes/No' },
+        };
+
+        const DecisionModes = {
+            'A1': {
+                english: 'Autocratic I (A1)', chinese: '專制型 I (A1)',
+                description_en: 'The leader makes the decision alone using information currently available.',
+                description_zh: '領導者單獨利用現有資訊做出決定。',
+            },
+            'A2': {
+                english: 'Autocratic II (A2)', chinese: '專制型 II (A2)',
+                description_en: 'The leader obtains necessary information from the subordinate(s) and then makes the decision alone.',
+                description_zh: '領導者向該下屬獲取必要資訊，然後單獨做出決定。',
+            },
+            'C1': {
+                english: 'Consultative I (C1)', chinese: '協商型 I (C1)',
+                description_en: 'The leader seeks input from the subordinate(s), but makes the final decision alone.',
+                description_zh: '領導者向該下屬徵求意見，但單獨做出最終決定。',
+            },
+            'G1': {
+                english: 'Group I (G1)', chinese: '團體型 I (G1)',
+                description_en: 'The leader and subordinate(s) analyze the problem together and try to reach consensus.',
+                description_zh: '領導者與該下屬共同分析問題，並試圖達成共識。',
+            },
+            'D1': {
+                english: 'Delegative I (D1)', chinese: '委派型 I (D1)',
+                description_en: 'The leader delegates the entire problem and decision authority to the subordinate(s) to decide on their own.',
+                description_zh: '領導者將整個問題和決策權委派給該下屬，讓其自行決定。',
+            },
+        };
+
+        // State Variables
+        let history = []; 
+        let currentQuestionCode = 'Q1';
+        let finalDecision = null;
+
+        // --- Path Logic Map ---
+        // Implement EXACTLY the 28 paths provided by the user.
+        // Logic Key: "Answer1-Answer2-..."
+        const PathLogic = {
+            // Root
+            "High": "Q2",
+            "Low": "Q2",
+
+            // --- Branch: Q1(High) -> Q2(High) ---
+            "High-High": "Q3",
+
+            // Q3 = Yes (Paths 1-4)
+            "High-High-Yes": "Q5",
+            "High-High-Yes-Yes": "A1", // Path 1
+            "High-High-Yes-No": "Q6",
+            "High-High-Yes-No-Yes": "Q8",
+            "High-High-Yes-No-Yes-Yes": "D1", // Path 2
+            "High-High-Yes-No-Yes-No": "G1",  // Path 3
+            "High-High-Yes-No-No": "G1",      // Path 4
+
+            // Q3 = No (Paths 5-17)
+            "High-High-No": "Q4",
+
+                // Q4 = No (Paths 5-10)
+                "High-High-No-No": "Q5",
+                    // Q5 = Yes (Paths 5-7)
+                    "High-High-No-No-Yes": "Q6",
+                    "High-High-No-No-Yes-No": "C1", // Path 5
+                    "High-High-No-No-Yes-Yes": "Q8",
+                    "High-High-No-No-Yes-Yes-No": "C1", // Path 6
+                    "High-High-No-No-Yes-Yes-Yes": "D1", // Path 7
+                    // Q5 = No (Paths 8-10)
+                    "High-High-No-No-No": "Q6",
+                    "High-High-No-No-No-Yes": "Q8",
+                    "High-High-No-No-No-Yes-Yes": "D1", // Path 8
+                    "High-High-No-No-No-Yes-No": "G1",  // Path 9
+                    "High-High-No-No-No-No": "G1",      // Path 10
+
+                // Q4 = Yes (Paths 11-17)
+                "High-High-No-Yes": "Q5",
+                    // Q5 = No (Paths 11-13)
+                    "High-High-No-Yes-No": "Q6",
+                    "High-High-No-Yes-No-Yes": "Q8",
+                    "High-High-No-Yes-No-Yes-Yes": "D1", // Path 11
+                    "High-High-No-Yes-No-Yes-No": "G1",  // Path 12
+                    "High-High-No-Yes-No-No": "G1",      // Path 13
+                    // Q5 = Yes (Paths 14-17)
+                    "High-High-No-Yes-Yes": "Q6",
+                    "High-High-No-Yes-Yes-No": "A2", // Path 14
+                    "High-High-No-Yes-Yes-Yes": "Q7",
+                    "High-High-No-Yes-Yes-Yes-No": "Q8", // Paths 15, 16 start
+                    "High-High-No-Yes-Yes-Yes-No-No": "A2", // Path 15
+                    "High-High-No-Yes-Yes-Yes-No-Yes": "D1", // Path 16
+                    "High-High-No-Yes-Yes-Yes-Yes": "C1", // Path 17
+
+            // --- Branch: Q1(High) -> Q2(Low) ---
+            "High-Low": "Q3",
+
+            // Q3 = Yes (Path 25)
+            "High-Low-Yes": "A1", // Path 25
+
+            // Q3 = No (Paths 18-24)
+            "High-Low-No": "Q4",
+            
+                // Q4 = Yes (Paths 18-21)
+                "High-Low-No-Yes": "Q6",
+                "High-Low-No-Yes-No": "A2", // Path 18
+                "High-Low-No-Yes-Yes": "Q7",
+                "High-Low-No-Yes-Yes-Yes": "C1", // Path 21
+                "High-Low-No-Yes-Yes-No": "Q8",
+                "High-Low-No-Yes-Yes-No-Yes": "D1", // Path 20
+                "High-Low-No-Yes-Yes-No-No": "A2",  // Path 19
+
+                // Q4 = No (Paths 22-24)
+                "High-Low-No-No": "Q6",
+                "High-Low-No-No-No": "C1", // Path 22
+                "High-Low-No-No-Yes": "Q8",
+                "High-Low-No-No-Yes-No": "C1", // Path 23
+                "High-Low-No-No-Yes-Yes": "D1", // Path 24
+
+            // --- Branch: Q1(Low) -> Q2(Low) ---
+            "Low-Low": "A1", // Path 26
+
+            // --- Branch: Q1(Low) -> Q2(High) ---
+            "Low-High": "Q5",
+            "Low-High-Yes": "A1", // Path 27
+            "Low-High-No": "D1",  // Path 28
+        };
+
+        // --- Core Logic ---
+
+        // Function to determine the next question or final decision based on current state and answer
+        function getNextQuestionCode(currentQ, answer) {
+            // Construct the path key
+            const currentPath = history.map(h => h.answer).join('-');
+            const newPath = currentPath ? `${currentPath}-${answer}` : answer;
+
+            const nextStep = PathLogic[newPath];
+
+            if (nextStep) {
+                return nextStep;
+            } else {
+                return 'ERROR';
+            }
+        }
+
+        // --- UI Rendering and State Management ---
+
+        function render() {
+            const card = document.getElementById('decision-card');
+            const historyLog = document.getElementById('history-log');
+            const backButton = document.getElementById('back-button');
+
+            backButton.disabled = history.length === 0;
+
+            // Render Final Decision
+            if (finalDecision) {
+                const mode = DecisionModes[finalDecision];
+                card.innerHTML = `
+                    <div class="text-center mb-10">
+                        <p class="text-xl font-semibold text-gray-500 mb-2">Recommended Decision Style | 建議決策方式</p>
+                        <h1 class="text-8xl font-extrabold text-blue-900 mb-4">${finalDecision}</h1>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">${mode.english.split('(')[0].trim()}</h2>
+                        <p class="text-xl font-medium text-gray-600">${mode.chinese.split('(')[0].trim()}</p>
+                    </div>
+                    
+                    <div class="result-box p-6 rounded-lg bg-blue-50">
+                        <p class="text-lg text-gray-700 mb-4 italic">
+                            ${mode.description_en}
+                        </p>
+                        <p class="text-lg text-gray-700">
+                            <span class="font-semibold text-gray-800">說明:</span> ${mode.description_zh}
+                        </p>
+                    </div>
+
+                    <div class="mt-8 text-center">
+                        <button onclick="restart()" class="py-3 px-6 rounded-lg text-white font-bold bg-blue-500 hover:bg-blue-700 btn-primary">
+                            重新開始分析 Restart Analysis
+                        </button>
+                    </div>
+                `;
+            } 
+            // Render Current Question
+            else {
+                const q = Questions[currentQuestionCode];
+                let answers = [];
+                let buttonStyleMap = {};
+
+                if (q.type === 'High/Low') {
+                    answers = [
+                        { text_zh: '高 (High)', value: 'High' },
+                        { text_zh: '低 (Low)', value: 'Low' }
+                    ];
+                    buttonStyleMap = {
+                        'High': 'btn-yes',
+                        'Low': 'btn-no'
+                    };
+                } else { // Yes/No type
+                    answers = [
+                        { text_zh: '是 (Yes)', value: 'Yes' },
+                        { text_zh: '否 (No)', value: 'No' }
+                    ];
+                    buttonStyleMap = {
+                        'Yes': 'btn-yes',
+                        'No': 'btn-no'
+                    };
+                }
+
+                card.innerHTML = `
+                    <p class="text-xl font-semibold text-gray-500 mb-2">${currentQuestionCode}</p>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-gray-800 mb-6">${q.zh}</h2>
+                    <h3 class="text-lg md:text-xl font-semibold text-gray-600 mb-8">${q.en}</h3>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        ${answers.map(a => `
+                            <button onclick="handleAnswer('${a.value}')" 
+                                class="py-4 px-6 rounded-xl text-white font-bold text-lg btn-primary ${buttonStyleMap[a.value] || 'bg-gray-400'}">
+                                ${a.text_zh}
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // Update History Log
+            historyLog.innerHTML = '';
+            if (history.length === 0) {
+                historyLog.innerHTML = `<p class="italic text-center pt-8">從第一個問題開始 (Start with the first question)</p>`;
+            } else {
+                history.forEach((step, index) => {
+                    const q = Questions[step.question];
+                    const answerText = step.answer === 'High' ? '高' : step.answer === 'Low' ? '低' : step.answer === 'Yes' ? '是' : '否';
+                    historyLog.innerHTML += `
+                        <p class="border-b border-gray-100 pb-1">
+                            <span class="font-bold text-gray-800">${step.question}:</span> 
+                            ${q.zh.split('？')[0]} (${q.en.split('?')[0].trim()}) 
+                            <span class="font-bold text-blue-600 ml-2">→ ${answerText}</span>
+                        </p>
+                    `;
+                });
+                if (finalDecision) {
+                     historyLog.innerHTML += `
+                        <p class="pt-2">
+                            <span class="font-bold text-blue-700">結果 (Result):</span> 
+                            <span class="font-extrabold text-blue-900">${DecisionModes[finalDecision].chinese} (${finalDecision})</span>
+                        </p>
+                    `;
+                }
+            }
+        }
+
+        function handleAnswer(answer) {
+            const previousQuestionCode = currentQuestionCode; 
+            const nextCode = getNextQuestionCode(previousQuestionCode, answer);
+
+            history.push({ question: previousQuestionCode, answer: answer });
+            
+            if (DecisionModes[nextCode]) {
+                finalDecision = nextCode;
+            } else if (nextCode === 'ERROR') {
+                // Error handling
+                console.error("Decision tree logic error. Path:", history.map(h => h.answer).join('-'));
+                // Use a custom modal instead of alert()
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'fixed inset-0 bg-red-100 bg-opacity-90 flex items-center justify-center z-50 rounded-lg p-8';
+                errorMessage.innerHTML = `
+                    <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm text-center">
+                        <h4 class="text-xl font-bold text-red-600 mb-4">路徑未定義或錯誤 (Path Undefined or Error)</h4>
+                        <p class="text-gray-700 mb-6">您選擇的路徑 ${history.map(h => h.answer).join('-')} 不在決策樹定義中。</p>
+                        <button onclick="document.body.removeChild(this.parentNode.parentNode); restart();" class="py-2 px-4 bg-gray-800 text-white rounded-lg hover:bg-gray-700">
+                            重新開始 (Restart)
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(errorMessage);
+            } else {
+                currentQuestionCode = nextCode;
+            }
+            render();
+        }
+
+        function goBack() {
+            if (history.length > 0) {
+                finalDecision = null; 
+                history.pop(); // Remove last step
+                
+                if (history.length === 0) {
+                    currentQuestionCode = 'Q1';
+                } else {
+                    // Re-calculate the current question based on the truncated history
+                    let tempHistory = [];
+                    currentQuestionCode = 'Q1';
+                    
+                    // Re-simulate step by step
+                    for(let i=0; i<history.length; i++) {
+                        const answer = history[i].answer;
+                        const pathStr = tempHistory.map(h => h.answer).join('-') + (tempHistory.length > 0 ? `-${answer}` : answer);
+                        const next = PathLogic[pathStr];
+                        
+                        if (!DecisionModes[next]) {
+                            currentQuestionCode = next;
+                        }
+                        tempHistory.push(history[i]);
+                    }
+                }
+            } else {
+                currentQuestionCode = 'Q1';
+            }
+            render();
+        }
+
+        function restart() {
+            history = [];
+            currentQuestionCode = 'Q1';
+            finalDecision = null;
+            render();
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', render);
+    </script>
+</body>
+</html>
